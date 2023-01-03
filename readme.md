@@ -38,3 +38,19 @@ ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./r
 export KUBECONFIG=kubeconfig
 kubectl get node
 ```
+
+## Upgrade RKE2 cluster
+1. Change the destination version in `env_vars_upgrade.yaml`
+2. Upgrade RKE2 servers
+```
+ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./rke2-upgrade-server.yaml -l rke2-master-0
+ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./rke2-upgrade-server.yaml -l rke2-master-1
+```
+3. Upgrade RKE2 agents
+```
+ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./rke2-upgrade-agent.yaml -l rke2-infra-0
+ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./rke2-upgrade-agent.yaml -l rke2-infra-1
+...
+ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./rke2-upgrade-agent.yaml -l rke2-worker-0
+ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u <user> -i inventory_file ./rke2-upgrade-agent.yaml -l rke2-worker-1
+```
