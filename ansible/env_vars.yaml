@@ -1,0 +1,8 @@
+RKE2_VERSION: "v1.24.6+rke2r1"
+CONTAINER_RUNTIME_ENDPOINT: "unix:///run/k3s/containerd/containerd.sock"
+CONTAINERD_ADDRESS: "/run/k3s/containerd/containerd.sock"
+KUBE_VIP_IMAGE: "ghcr.io/kube-vip/kube-vip"
+KUBE_VIP_IMAGE_TAG: "v0.5.0"
+KUBE_VIP_INTERFACE: "eth0"
+KUBE_VIP_ADDRESS: "192.168.0.50"
+API_DOMAIN: "api.rke2.mycloud"

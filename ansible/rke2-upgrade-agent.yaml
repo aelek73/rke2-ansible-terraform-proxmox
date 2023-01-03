@@ -1,0 +1,15 @@
+- name: Upgrade RKE2 agent
+  hosts: ~rke2-worker-[0-5],~rke2-infra-[0-2]
+  become: true
+  vars_files:
+    - env_vars_upgrade.yaml 
+
+  tasks:
+  - name: Install RKE2 agent
+    shell: |
+      curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION="{{ RKE2_VERSION }}" sh -
+
+  - name: Restart rke2-agent service
+    ansible.builtin.service:
+      name: rke2-agent
+      state: restarted

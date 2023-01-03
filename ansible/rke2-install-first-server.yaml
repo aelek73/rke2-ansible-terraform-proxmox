@@ -1,0 +1,112 @@
+- name: Install the first RKE2 server
+  hosts: rke2-master-0
+  become: true
+  vars_files:
+    - env_vars.yaml 
+
+  tasks:
+  - name: Create directories
+    file:
+      path: "{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: 0755
+      recurse: yes
+    loop:
+      - "/etc/rancher/rke2"
+      - "/var/lib/rancher/rke2/server/manifests"
+
+  - name: Create the config.yaml file
+    copy:
+      dest: "/etc/rancher/rke2/config.yaml"
+      content: |
+        tls-san:
+          - "{{ ansible_ssh_host }}"
+          - "{{ API_DOMAIN }}"
+          - "{{ KUBE_VIP_ADDRESS }}"
+        cni: "cilium"
+        etcd-snapshot-schedule-cron: "0 */4 * * *"
+        etcd-snapshot-retention: 10
+        disable:
+          - rke2-canal
+          - rke2-ingress-nginx
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Create the CoreDNS config file
+    copy:
+      dest: "/var/lib/rancher/rke2/server/manifests/rke2-coredns-config.yaml"
+      content: |
+        apiVersion: helm.cattle.io/v1
+        kind: HelmChartConfig
+        metadata:
+          creationTimestamp: null
+          name: rke2-coredns
+          namespace: kube-system
+        spec:
+          valuesContent: |-
+            nodelocal:
+              enabled: true
+          bootstrap: true
+
+  - name: Install containerd
+    ansible.builtin.apt:
+      name:
+        - containerd 
+
+  - name: Download kube-vip RBAC file
+    get_url:
+      url: https://kube-vip.io/manifests/rbac.yaml
+      dest: "/tmp/kube-vip-rbac.yaml"
+
+  - name: Generate kube-vip daemonset file
+    shell: |
+      ctr --namespace k8s.io image pull "{{ KUBE_VIP_IMAGE }}":"{{ KUBE_VIP_IMAGE_TAG }}"
+      ctr --namespace k8s.io run --rm --net-host "{{ KUBE_VIP_IMAGE }}":"{{ KUBE_VIP_IMAGE_TAG }}" vip /kube-vip \
+      manifest daemonset \
+      --arp \
+      --interface "{{ KUBE_VIP_INTERFACE }}" \
+      --address "{{ KUBE_VIP_ADDRESS }}" \
+      --cidr "24" \
+      --controlplane \
+      --leaderElection \
+      --taint \
+      --services \
+      --inCluster | tee "/tmp/kube-vip.yaml"
+
+  - name: Install RKE2 server
+    shell: |
+      curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL=stable INSTALL_RKE2_VERSION="{{ RKE2_VERSION }}" sh -
+
+  - name: Start rke2-server service
+    ansible.builtin.service:
+      name: rke2-server
+      state: started
+  
+  - name: Enable rke2-server service
+    ansible.builtin.systemd:
+      name: rke2-server
+      enabled: yes
+
+  - name: Apply kube-vip manifest files
+    shell: |
+      export KUBECONFIG=/var/lib/rancher/rke2/server/cred/admin.kubeconfig
+      cd /var/lib/rancher/rke2/bin
+      ./kubectl apply -f /tmp/kube-vip-rbac.yaml
+      ./kubectl apply -f /tmp/kube-vip.yaml
+
+  - name: Get token
+    command: cat /var/lib/rancher/rke2/server/node-token
+    register: tokenfile_content
+
+  - name: Print token
+    debug:
+      msg: "{{ tokenfile_content.stdout }}"
+  
+  - name: Copy kubeconfig from remote to local
+    fetch:
+     src: /etc/rancher/rke2/rke2.yaml
+     dest: kubeconfig
+     flat: yes
