@@ -1,3 +1,5 @@
+# This repository didn't updated for a long time, may causing problems.
+
 ## Deploy RKE2 cluster with Terraform and Ansible in Proxmox
 
 1. Copy the `create-ci-template.sh` and run it on the Proxmox host
